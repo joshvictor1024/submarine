@@ -1,0 +1,4 @@
+## Append samples you want in your CSV to this file as resources ##
+resources:
+- submarine_v1_submarine.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

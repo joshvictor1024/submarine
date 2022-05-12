@@ -1,0 +1,25 @@
+apiVersion: submarine.apache.org/v1
+kind: Submarine
+metadata:
+  name: submarine-sample
+spec:
+  version: "0.7.0-SNAPSHOT"
+  server:
+    # image: "apache/submarine:server-0.7.0-SNAPSHOT" # overwrite the image when development
+    image: "apache/submarine:server-0.7.0"
+    replicas: 1
+  database:
+    # image: "apache/submarine:database-0.7.0-SNAPSHOT" # overwrite the image when development
+    image: "apache/submarine:database-0.7.0"
+    replicas: 1
+    storageSize: "1Gi"
+    mysqlRootPasswordSecret: "root-pass-secret"
+  tensorboard:
+    enabled: true
+    storageSize: "10Gi"
+  mlflow:
+    enabled: true
+    storageSize: "10Gi"
+  minio:
+    enabled: true
+    storageSize: "10Gi"
