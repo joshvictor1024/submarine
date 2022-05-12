@@ -39,15 +39,18 @@ spec:
     - name: "submarine-database"
       port: 3306
       targetPort: 3306
+  clusterIP: None
+  type: ClusterIP
   selector:
     app: "submarine-database"
 ---
 # Source: submarine/templates/submarine-database.yaml
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: "submarine-database"
 spec:
+  serviceName: submarine-database
   replicas: 1
   selector:
     matchLabels:
@@ -56,11 +59,11 @@ spec:
     metadata:
       labels:
         app: "submarine-database"
-
     spec:
+      serviceAccountName: "submarine-storage"
       containers:
         - name: "submarine-database"
-          image: "apache/submarine:database-0.7.0-SNAPSHOT"
+          image: "apache/submarine:database-0.8.0-SNAPSHOT"
           imagePullPolicy: "IfNotPresent"
           ports:
             - containerPort: 3306

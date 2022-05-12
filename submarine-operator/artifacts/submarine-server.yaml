@@ -6,6 +6,12 @@ metadata:
   name: "submarine-server"
 ---
 # Source: submarine/templates/submarine-server.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "default"
+---
+# Source: submarine/templates/submarine-server.yaml
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -34,6 +40,7 @@ spec:
   - port: 8080
     targetPort: 8080
     protocol: TCP
+    name: http
   selector:
     app: "submarine-server"
 ---
@@ -51,16 +58,16 @@ spec:
     metadata:
       labels:
         app: "submarine-server"
-      
+
     spec:
       serviceAccountName: "submarine-server"
       initContainers:
       - name: submarine-server-initcontainer
         image: "minio/mc"
-        command: ["/bin/bash", "-c", 
+        command: ["/bin/bash", "-c",
         "cnt=0;
-        while ! /bin/bash -c 'mc config host add minio http://submarine-minio-service:9000 
-        submarine_minio submarine_minio' 2>&1; 
+        while ! /bin/bash -c 'mc --config-dir /root/.mc config host add minio http://submarine-minio-service:9000
+        submarine_minio submarine_minio' 2>&1;
         do
           sleep 15;
           ((cnt=cnt+1));
@@ -69,11 +76,17 @@ spec:
             exit 1;
           fi;
         done;
-        if /bin/bash -c 'mc ls minio/submarine' >/dev/null 2>&1; then
+        if /bin/bash -c 'mc --config-dir /root/.mc ls minio/submarine' >/dev/null 2>&1; then
           echo 'Bucket minio/submarine already exists, skipping creation.';
         else
-          /bin/bash -c 'mc mb minio/submarine';
+          /bin/bash -c 'mc --config-dir /root/.mc mb minio/submarine';
         fi;"]
+        volumeMounts:
+          - name: mc-config-vol
+            mountPath: /root/.mc
+      volumes:
+        - name: mc-config-vol
+          emptyDir: { }
       containers:
       - name: "submarine-server"
         env:
@@ -84,7 +97,7 @@ spec:
         - name: K8S_APISERVER_URL
           value: "kubernetes.default.svc"
 
-        image: "apache/submarine:server-0.7.0-SNAPSHOT"
+        image: "apache/submarine:server-0.8.0-SNAPSHOT"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
