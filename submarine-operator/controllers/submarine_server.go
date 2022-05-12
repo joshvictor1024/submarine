@@ -114,8 +114,7 @@ func (r *SubmarineReconciler) createSubmarineServer(ctx context.Context, submari
 	err := r.Get(ctx, types.NamespacedName{Name: serverName, Namespace: submarine.Namespace}, submarine)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		serviceaccount := r.newSubmarineServerServiceAccount()
-		if serviceaccount, err := r.newSubmarineServerServiceAccount(); err != nil {
+		if serviceaccount, err = newSubmarineServerServiceAccount(); err != nil {
 			return err
 		}
 		if err = controllerutil.SetControllerReference(submarine, serviceaccount, r.Scheme); err != nil {

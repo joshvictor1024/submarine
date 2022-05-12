@@ -96,22 +96,22 @@ func (r *SubmarineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	l.Info("Enter Reconcile", "spec", submarine.Spec, "status", submarine.Status)
 
 	// Take action based on submarine state
-	switch submarine.Status.SubmarineState.State {
+	switch submarine.Status.State {
 	case submarinev1.NewState:
 		//c.recordSubmarineEvent(submarineCopy)
 		if err := r.validateSubmarine(submarine); err != nil {
-			submarine.Status.SubmarineState.State = submarinev1.FailedState
-			submarine.Status.SubmarineState.ErrorMessage = err.Error()
+			submarine.Status.State = submarinev1.FailedState
+			submarine.Status.ErrorMessage = err.Error()
 			// c.recordSubmarineEvent(submarineCopy)
 		} else {
-			submarine.Status.SubmarineState.State = submarinev1.CreatingState
+			submarine.Status.State = submarinev1.CreatingState
 			// c.recordSubmarineEvent(submarineCopy)
 		}
 	case submarinev1.CreatingState:
 		//if err := c.createSubmarine(submarineCopy); err != nil {
 		if err := r.createSubmarine(ctx, submarine); err != nil {
-			submarine.Status.SubmarineState.State = submarinev1.FailedState
-			submarine.Status.SubmarineState.ErrorMessage = err.Error()
+			submarine.Status.State = submarinev1.FailedState
+			submarine.Status.ErrorMessage = err.Error()
 			// c.recordSubmarineEvent(submarineCopy)
 		}
 		// ok, err := c.checkSubmarineDependentsReady(submarineCopy)
