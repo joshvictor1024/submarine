@@ -89,6 +89,9 @@ submarine-cloud-v2/helm-charts/submarine-operator/charts/*
 # add operator docker build tmp
 dev-support/docker-images/operator/tmp/
 
+# submarine-operator
+submarine-operator/vendor/*
+
 # vscode file
 .project
 .classpath
