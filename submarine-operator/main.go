@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	submarinev1 "github.com/apache/submarine/submarine-operator/api/v1"
+	submarinev1alpha1 "github.com/apache/submarine/submarine-operator/api/v1alpha1"
 	"github.com/apache/submarine/submarine-operator/controllers"
 	//+kubebuilder:scaffold:imports
 )
@@ -44,7 +44,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(submarinev1.AddToScheme(scheme))
+	utilruntime.Must(submarinev1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

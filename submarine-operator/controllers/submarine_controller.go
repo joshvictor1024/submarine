@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	submarinev1 "github.com/apache/submarine/submarine-operator/api/v1"
+	submarinev1alpha1 "github.com/apache/submarine/submarine-operator/api/v1alpha1"
 )
 
 const (
@@ -84,7 +84,7 @@ func (r *SubmarineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// TODO(user): your logic here
 
-	submarine := &submarinev1.Submarine{}
+	submarine := &submarinev1alpha1.Submarine{}
 	err := r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, submarine)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -97,36 +97,36 @@ func (r *SubmarineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 
 	// Take action based on submarine state
 	switch submarine.Status.State {
-	case submarinev1.NewState:
+	case submarinev1alpha1.NewState:
 		//c.recordSubmarineEvent(submarineCopy)
 		if err := r.validateSubmarine(submarine); err != nil {
-			submarine.Status.State = submarinev1.FailedState
+			submarine.Status.State = submarinev1alpha1.FailedState
 			submarine.Status.ErrorMessage = err.Error()
 			// c.recordSubmarineEvent(submarineCopy)
 		} else {
-			submarine.Status.State = submarinev1.CreatingState
+			submarine.Status.State = submarinev1alpha1.CreatingState
 			// c.recordSubmarineEvent(submarineCopy)
 		}
-	case submarinev1.CreatingState:
+	case submarinev1alpha1.CreatingState:
 		//if err := c.createSubmarine(submarineCopy); err != nil {
 		if err := r.createSubmarine(ctx, submarine); err != nil {
-			submarine.Status.State = submarinev1.FailedState
+			submarine.Status.State = submarinev1alpha1.FailedState
 			submarine.Status.ErrorMessage = err.Error()
 			// c.recordSubmarineEvent(submarineCopy)
 		}
 		// ok, err := c.checkSubmarineDependentsReady(submarineCopy)
 		// if err != nil {
-		// 	submarine.Status.SubmarineState.State = submarinev1.FailedState
+		// 	submarine.Status.SubmarineState.State = submarinev1alpha1.FailedState
 		// 	submarine.Status.SubmarineState.ErrorMessage = err.Error()
 		// 	// c.recordSubmarineEvent(submarineCopy)
 		// }
 		// if ok {
-		// 	submarine.Status.SubmarineState.State = submarinev1.RunningState
+		// 	submarine.Status.SubmarineState.State = submarinev1alpha1.RunningState
 		// 	// c.recordSubmarineEvent(submarineCopy)
 		// }
-		// case submarinev1.RunningState:
+		// case submarinev1alpha1.RunningState:
 		// 	if err := c.createSubmarine(submarineCopy); err != nil {
-		// 		submarine.Status.SubmarineState.State = submarinev1.FailedState
+		// 		submarine.Status.SubmarineState.State = submarinev1alpha1.FailedState
 		// 		submarine.Status.SubmarineState.ErrorMessage = err.Error()
 		// 		c.recordSubmarineEvent(submarineCopy)
 		// 	}
@@ -136,7 +136,7 @@ func (r *SubmarineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	return ctrl.Result{}, nil
 }
 
-func (r *SubmarineReconciler) validateSubmarine(submarine *submarinev1.Submarine) error {
+func (r *SubmarineReconciler) validateSubmarine(submarine *submarinev1alpha1.Submarine) error {
 
 	// Print out the spec of the Submarine resource
 	b, err := json.MarshalIndent(submarine.Spec, "", "  ")
@@ -149,7 +149,7 @@ func (r *SubmarineReconciler) validateSubmarine(submarine *submarinev1.Submarine
 	return nil
 }
 
-func (r *SubmarineReconciler) createSubmarine(ctx context.Context, submarine *submarinev1.Submarine) error {
+func (r *SubmarineReconciler) createSubmarine(ctx context.Context, submarine *submarinev1alpha1.Submarine) error {
 	var err error
 	err = r.createSubmarineServer(ctx, submarine)
 	if err != nil {
@@ -192,6 +192,6 @@ func (r *SubmarineReconciler) createSubmarine(ctx context.Context, submarine *su
 // SetupWithManager sets up the controller with the Manager.
 func (r *SubmarineReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&submarinev1.Submarine{}).
+		For(&submarinev1alpha1.Submarine{}).
 		Complete(r)
 }

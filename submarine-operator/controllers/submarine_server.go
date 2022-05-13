@@ -19,36 +19,36 @@ package controllers
 
 import (
 	"context"
-	// "fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
-	//"k8s.io/klog/v2"
-	submarinev1 "github.com/apache/submarine/submarine-operator/api/v1"
+	submarinev1alpha1 "github.com/apache/submarine/submarine-operator/api/v1alpha1"
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-func newSubmarineServerServiceAccount() (*corev1.ServiceAccount, error) {
-	serviceAccount, err := ParseServiceAccountYaml(serverYamlPath)
-	if err != nil {
-		//klog.Info("[Error] ParseServiceAccountYaml", err)
-		return nil, err
-	}
-	// serviceAccount.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
-	// 	*metav1.NewControllerRef(submarine, v1alpha1.SchemeGroupVersion.WithKind("Submarine")),
-	// }
-	return serviceAccount, nil
-}
+// func newSubmarineServerServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
+// 	l := log.FromContext(ctx)
+// 	serviceAccount, err := ParseServiceAccountYaml(serverYamlPath)
+// 	if err != nil {
+// 		l.Error(err, "ParseServiceAccountYaml")
+// 		return nil, err
+// 	}
+// 	// serviceAccount.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
+// 	// 	*metav1.NewControllerRef(submarine, v1alpha1.SchemeGroupVersion.WithKind("Submarine")),
+// 	// }
+// 	return serviceAccount, nil
+// }
 
-func newSubmarineServerService() (*corev1.Service, error) {
+func newSubmarineServerService(ctx context.Context) (*corev1.Service, error) {
+	l := log.FromContext(ctx)
 	service, err := ParseServiceYaml(serverYamlPath)
 	if err != nil {
-		//klog.Info("[Error] ParseServiceYaml", err)
+		l.Error(err, "ParseServiceYaml")
 		return nil, err
 	}
 	// service.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
@@ -57,7 +57,8 @@ func newSubmarineServerService() (*corev1.Service, error) {
 	return service, nil
 }
 
-func newSubmarineServerDeployment(submarine *submarinev1.Submarine) (*appsv1.Deployment, error) {
+func newSubmarineServerDeployment(ctx context.Context, submarine *submarinev1alpha1.Submarine) (*appsv1.Deployment, error) {
+	l := log.FromContext(ctx)
 	serverReplicas := *submarine.Spec.Server.Replicas
 
 	//ownerReference := *metav1.NewControllerRef(submarine, v1alpha1.SchemeGroupVersion.WithKind("Submarine"))
@@ -90,6 +91,7 @@ func newSubmarineServerDeployment(submarine *submarinev1.Submarine) (*appsv1.Dep
 
 	deployment, err := ParseDeploymentYaml(serverYamlPath)
 	if err != nil {
+		l.Error(err, "ParseDeploymentYaml")
 		// klog.Info("[Error] ParseDeploymentYaml", err)
 		return nil, err
 	}
@@ -104,24 +106,25 @@ func newSubmarineServerDeployment(submarine *submarinev1.Submarine) (*appsv1.Dep
 
 // createSubmarineServer is a function to create submarine-server.
 // Reference: https://github.com/apache/submarine/blob/master/helm-charts/submarine/templates/submarine-server.yaml
-func (r *SubmarineReconciler) createSubmarineServer(ctx context.Context, submarine *submarinev1.Submarine) error {
+func (r *SubmarineReconciler) createSubmarineServer(ctx context.Context, submarine *submarinev1alpha1.Submarine) error {
 	l := log.FromContext(ctx)
 	l.Info("[createSubmarineServer]")
-	//klog.Info("[createSubmarineServer]")
 
-	// Step1: Create ServiceAccount
-	serviceaccount := &corev1.ServiceAccount{}
+	// Step1: Create Service
+	service := &corev1.Service{}
 	err := r.Get(ctx, types.NamespacedName{Name: serverName, Namespace: submarine.Namespace}, submarine)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		if serviceaccount, err = newSubmarineServerServiceAccount(); err != nil {
+		if service, err = newSubmarineServerService(ctx); err != nil {
+			l.Error(err, "Create Service", "service name", service.Name)
 			return err
 		}
-		if err = controllerutil.SetControllerReference(submarine, serviceaccount, r.Scheme); err != nil {
+		if err = controllerutil.SetControllerReference(submarine, service, r.Scheme); err != nil {
 			//return reconcile.Result{}, err
+			l.Error(err, "Create Service")
 			return err
 		}
-		if err = r.Create(ctx, serviceaccount); err != nil {
+		if err = r.Create(ctx, service); err != nil {
 			// return ctrl.Result{}, err
 			return err
 		}
