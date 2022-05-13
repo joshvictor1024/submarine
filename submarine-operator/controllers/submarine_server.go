@@ -19,10 +19,12 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	submarinev1alpha1 "github.com/apache/submarine/submarine-operator/api/v1alpha1"
@@ -31,33 +33,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
-// func newSubmarineServerServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
-// 	l := log.FromContext(ctx)
-// 	serviceAccount, err := ParseServiceAccountYaml(serverYamlPath)
-// 	if err != nil {
-// 		l.Error(err, "ParseServiceAccountYaml")
-// 		return nil, err
-// 	}
-// 	// serviceAccount.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
-// 	// 	*metav1.NewControllerRef(submarine, v1alpha1.SchemeGroupVersion.WithKind("Submarine")),
-// 	// }
-// 	return serviceAccount, nil
-// }
-
-func newSubmarineServerService(ctx context.Context) (*corev1.Service, error) {
+func (r *SubmarineReconciler) newSubmarineServerService(ctx context.Context, submarine *submarinev1alpha1.Submarine) *corev1.Service {
 	l := log.FromContext(ctx)
 	service, err := ParseServiceYaml(serverYamlPath)
 	if err != nil {
 		l.Error(err, "ParseServiceYaml")
-		return nil, err
 	}
-	// service.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
-	// 	*metav1.NewControllerRef(submarine, v1alpha1.SchemeGroupVersion.WithKind("Submarine")),
-	// }
-	return service, nil
+	service.Namespace = submarine.Namespace
+	err = controllerutil.SetControllerReference(submarine, service, r.Scheme)
+	if err != nil {
+		l.Error(err, "Set Service ControllerReference")
+	}
+	return service
 }
 
-func newSubmarineServerDeployment(ctx context.Context, submarine *submarinev1alpha1.Submarine) (*appsv1.Deployment, error) {
+func (r *SubmarineReconciler) newSubmarineServerDeployment(ctx context.Context, submarine *submarinev1alpha1.Submarine) *appsv1.Deployment {
 	l := log.FromContext(ctx)
 	serverReplicas := *submarine.Spec.Server.Replicas
 
@@ -92,16 +82,16 @@ func newSubmarineServerDeployment(ctx context.Context, submarine *submarinev1alp
 	deployment, err := ParseDeploymentYaml(serverYamlPath)
 	if err != nil {
 		l.Error(err, "ParseDeploymentYaml")
-		// klog.Info("[Error] ParseDeploymentYaml", err)
-		return nil, err
 	}
-	// deployment.ObjectMeta.OwnerReferences = []metav1.OwnerReference{
-	// 	ownerReference,
-	// }
+	deployment.Namespace = submarine.Namespace
+	err = controllerutil.SetControllerReference(submarine, deployment, r.Scheme)
+	if err != nil {
+		l.Error(err, "Set Deployment ControllerReference")
+	}
 	deployment.Spec.Replicas = &serverReplicas
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, operatorEnv...)
 
-	return deployment, nil
+	return deployment
 }
 
 // createSubmarineServer is a function to create submarine-server.
@@ -112,101 +102,65 @@ func (r *SubmarineReconciler) createSubmarineServer(ctx context.Context, submari
 
 	// Step1: Create Service
 	service := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: serverName, Namespace: submarine.Namespace}, submarine)
+	err := r.Get(ctx, types.NamespacedName{Name: serverName, Namespace: submarine.Namespace}, service)
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		if service, err = newSubmarineServerService(ctx); err != nil {
-			l.Error(err, "Create Service", "service name", service.Name)
-			return err
-		}
-		if err = controllerutil.SetControllerReference(submarine, service, r.Scheme); err != nil {
-			//return reconcile.Result{}, err
-			l.Error(err, "Create Service")
-			return err
-		}
-		if err = r.Create(ctx, service); err != nil {
-			// return ctrl.Result{}, err
-			return err
-		}
-		//klog.Info("	Create ServiceAccount: ", serviceaccount.Name)
+		service = r.newSubmarineServerService(ctx, submarine)
+		err = r.Create(ctx, service)
+		l.Info("Create Service", "service name", service.Name)
 	}
-	if err != nil {
-		if errors.IsNotFound(err) {
-			//return ctrl.Result{}, nil
-			return nil
-		}
-		// return ctrl.Result{}, err
-		return err
-	}
-
-	// serviceaccount, err := c.serviceaccountLister.ServiceAccounts(submarine.Namespace).Get(serverName)
-	// // If the resource doesn't exist, we'll create it
-	// if errors.IsNotFound(err) {
-	// 	serviceaccount, err = c.kubeclientset.CoreV1().ServiceAccounts(submarine.Namespace).Create(context.TODO(), newSubmarineServerServiceAccount(submarine), metav1.CreateOptions{})
-	// 	klog.Info("	Create ServiceAccount: ", serviceaccount.Name)
-	// }
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
 	// attempt processing again later. This could have been caused by a
 	// temporary network failure, or any other transient reason.
 	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
-	// TODO
-	// if !metav1.IsControlledBy(serviceaccount, submarine) {
-	// 	msg := fmt.Sprintf(MessageResourceExists, serviceaccount.Name)
-	// 	c.recorder.Event(submarine, corev1.EventTypeWarning, ErrResourceExists, msg)
-	// 	return fmt.Errorf(msg)
-	// }
+	if !metav1.IsControlledBy(service, submarine) {
+		msg := fmt.Sprintf(MessageResourceExists, service.Name)
+		//c.recorder.Event(submarine, corev1.EventTypeWarning, ErrResourceExists, msg)
+		l.Error(fmt.Errorf(msg), "Check Service ControllerReference", "service name", service.Name)
+		return fmt.Errorf(msg)
+	}
 
-	// // Step2: Create Service
-	// service, err := c.serviceLister.Services(submarine.Namespace).Get(serverName)
-	// // If the resource doesn't exist, we'll create it
-	// if errors.IsNotFound(err) {
-	// 	service, err = c.kubeclientset.CoreV1().Services(submarine.Namespace).Create(context.TODO(), newSubmarineServerService(submarine), metav1.CreateOptions{})
-	// 	klog.Info("	Create Service: ", service.Name)
-	// }
+	// Step2: Create Deployment
+	deployment := &appsv1.Deployment{}
+	err = r.Get(ctx, types.NamespacedName{Name: serverName, Namespace: submarine.Namespace}, deployment)
+	// If the resource doesn't exist, we'll create it
+	if errors.IsNotFound(err) {
+		deployment = r.newSubmarineServerDeployment(ctx, submarine)
+		err = r.Create(ctx, deployment)
+		l.Info("Create Deployment", "Deployment name", deployment.Name)
+	}
 
-	// // If an error occurs during Get/Create, we'll requeue the item so we can
-	// // attempt processing again later. This could have been caused by a
-	// // temporary network failure, or any other transient reason.
-	// if err != nil {
-	// 	return err
-	// }
+	// If an error occurs during Get/Create, we'll requeue the item so we can
+	// attempt processing again later. This could have been caused by a
+	// temporary network failure, or any other transient reason.
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
 
-	// if !metav1.IsControlledBy(service, submarine) {
-	// 	msg := fmt.Sprintf(MessageResourceExists, service.Name)
-	// 	c.recorder.Event(submarine, corev1.EventTypeWarning, ErrResourceExists, msg)
-	// 	return fmt.Errorf(msg)
-	// }
+	if !metav1.IsControlledBy(deployment, submarine) {
+		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+		//c.recorder.Event(submarine, corev1.EventTypeWarning, ErrResourceExists, msg)
+		return fmt.Errorf(msg)
+	}
 
-	// // Step3: Create Deployment
-	// deployment, err := c.deploymentLister.Deployments(submarine.Namespace).Get(serverName)
-	// // If the resource doesn't exist, we'll create it
-	// if errors.IsNotFound(err) {
-	// 	deployment, err = c.kubeclientset.AppsV1().Deployments(submarine.Namespace).Create(context.TODO(), newSubmarineServerDeployment(submarine), metav1.CreateOptions{})
-	// 	klog.Info("	Create Deployment: ", deployment.Name)
-	// }
+	// Update the replicas of the server deployment if it is not equal to spec
+	if submarine.Spec.Server.Replicas != nil && *submarine.Spec.Server.Replicas != *deployment.Spec.Replicas {
+		msg := fmt.Sprintf("Submarine %s server spec replicas", submarine.Name)
+		l.Info(msg, "server spec", *submarine.Spec.Server.Replicas, "actual", *deployment.Spec.Replicas)
 
-	// // If an error occurs during Get/Create, we'll requeue the item so we can
-	// // attempt processing again later. This could have been caused by a
-	// // temporary network failure, or any other transient reason.
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if !metav1.IsControlledBy(deployment, submarine) {
-	// 	msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
-	// 	c.recorder.Event(submarine, corev1.EventTypeWarning, ErrResourceExists, msg)
-	// 	return fmt.Errorf(msg)
-	// }
-
-	// // Update the replicas of the server deployment if it is not equal to spec
-	// if submarine.Spec.Server.Replicas != nil && *submarine.Spec.Server.Replicas != *deployment.Spec.Replicas {
-	// 	klog.V(4).Infof("Submarine %s server spec replicas: %d, actual replicas: %d", submarine.Name, *submarine.Spec.Server.Replicas, *deployment.Spec.Replicas)
-	// 	_, err = c.kubeclientset.AppsV1().Deployments(submarine.Namespace).Update(context.TODO(), newSubmarineServerDeployment(submarine), metav1.UpdateOptions{})
-	// }
+		deployment = r.newSubmarineServerDeployment(ctx, submarine)
+		err = r.Update(ctx, deployment)
+	}
 
 	if err != nil {
 		return err

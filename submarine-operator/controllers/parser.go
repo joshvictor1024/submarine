@@ -25,7 +25,8 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-	// traefikv1alpha1 "github.com/traefik/traefik/v2/pkg/provider/kubernetes/crd/traefik/v1alpha1"
+	//traefikv1alpha1 "github.com/traefik/traefik/v2/pkg/provider/kubernetes/crd/traefik/v1alpha1"
+	istiov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -102,6 +103,17 @@ func ParseDeploymentYaml(relativePath string) (*appsv1.Deployment, error) {
 	return &deployment, nil
 }
 
+// ParseStatefulSetYaml parse StatefulSets from yaml file.
+func ParseStatefulSetYaml(relativePath string) (*appsv1.StatefulSet, error) {
+	var statefulset appsv1.StatefulSet
+	marshaled, err := parseYaml(relativePath, "StatefulSet")
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(marshaled, &statefulset)
+	return &statefulset, nil
+}
+
 // ParseServiceYaml parse Service from yaml file.
 func ParseServiceYaml(relativePath string) (*v1.Service, error) {
 	var service v1.Service
@@ -157,7 +169,7 @@ func ParsePersistentVolumeClaimYaml(relativePath string) (*v1.PersistentVolumeCl
 	return &pvc, nil
 }
 
-// // ParseIngressRouteYaml parse IngressRoute from yaml file.
+// ParseIngressRouteYaml parse IngressRoute from yaml file.
 // func ParseIngressRouteYaml(relativePath string) (*traefikv1alpha1.IngressRoute, error) {
 // 	var ingressRoute traefikv1alpha1.IngressRoute
 // 	marshaled, err := parseYaml(relativePath, "IngressRoute")
@@ -167,3 +179,14 @@ func ParsePersistentVolumeClaimYaml(relativePath string) (*v1.PersistentVolumeCl
 // 	json.Unmarshal(marshaled, &ingressRoute)
 // 	return &ingressRoute, nil
 // }
+
+// ParseVirtualService parse VirtualService from yaml file.
+func ParseVirtualService(relativePath string) (*istiov1alpha3.VirtualService, error) {
+	var virtualService istiov1alpha3.VirtualService
+	marshaled, err := parseYaml(relativePath, "VirtualService")
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(marshaled, &virtualService)
+	return &virtualService, nil
+}

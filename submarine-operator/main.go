@@ -31,9 +31,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	istioscheme "istio.io/client-go/pkg/clientset/versioned/scheme"
+
 	submarinev1alpha1 "github.com/apache/submarine/submarine-operator/api/v1alpha1"
 	"github.com/apache/submarine/submarine-operator/controllers"
 	//+kubebuilder:scaffold:imports
+)
+
+var (
+	metricsAddr          string
+	enableLeaderElection bool
+	probeAddr            string
+
+	masterURL string
+	//kubeconfig              string
+	incluster               bool
+	clusterType             string
+	createPodSecurityPolicy bool
 )
 
 var (
@@ -43,20 +57,25 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(istioscheme.AddToScheme(scheme))
 
 	utilruntime.Must(submarinev1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	flag.BoolVar(&incluster, "incluster", false, "Run submarine-operator in-cluster")
+	//flag.StringVar(&kubeconfig, "kubeconfig", os.Getenv("HOME")+"/.kube/config", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&clusterType, "clustertype", "kubernetes", "K8s cluster type, can be kubernetes or openshift")
+	flag.BoolVar(&createPodSecurityPolicy, "createpsp", true, "Specifies whether a PodSecurityPolicy should be created. This configuration enables the database/minio/server to set securityContext.runAsUser")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -79,8 +98,11 @@ func main() {
 	}
 
 	if err = (&controllers.SubmarineReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:                  mgr.GetClient(),
+		Scheme:                  mgr.GetScheme(),
+		Incluster:               incluster,
+		ClusterType:             clusterType,
+		CreatePodSecurityPolicy: createPodSecurityPolicy,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Submarine")
 		os.Exit(1)
